@@ -1,0 +1,10 @@
+services:
+  - name: knock-order-server
+    type: web
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: KNOCK_API_KEY
+        sync: false

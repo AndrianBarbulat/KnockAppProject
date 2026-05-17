@@ -1,22 +1,4 @@
-# Environment
-.env
-.env.local
-.env.*.local
-server/.env
-
-# Dependencies
 node_modules/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS
+.env
+client/build/
 .DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
-*.swp
