@@ -66,6 +66,77 @@ app.get("/api/orders", (req, res) => {
   res.json(orders);
 });
 
+app.put("/api/orders/:id/ship", async (req, res) => {
+  try {
+    const order = orders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    order.status = "shipped";
+    order.updatedAt = new Date().toISOString();
+
+    await knock.workflows.trigger("order-shipped", {
+      recipients: ["demo-user"],
+      data: {
+        orderNumber: order.id,
+        itemNames: order.items.map(i => i.name).join(", "),
+        total: order.total
+      }
+    });
+
+    res.json(order);
+  } catch (err) {
+    console.error("Ship order failed:", err);
+    res.status(500).json({ error: "Failed to ship order" });
+  }
+});
+
+app.put("/api/orders/:id/deliver", async (req, res) => {
+  try {
+    const order = orders.find(o => o.id === req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    order.status = "delivered";
+    order.updatedAt = new Date().toISOString();
+
+    await knock.workflows.trigger("order-delivered", {
+      recipients: ["demo-user"],
+      data: {
+        orderNumber: order.id
+      }
+    });
+
+    res.json(order);
+  } catch (err) {
+    console.error("Deliver order failed:", err);
+    res.status(500).json({ error: "Failed to deliver order" });
+  }
+});
+
+app.get("/api/preferences", async (req, res) => {
+  try {
+    const preferences = await knock.users.getPreferences("demo-user", "default");
+    res.json(preferences);
+  } catch (err) {
+    console.error("Get preferences failed:", err);
+    res.status(500).json({ error: "Failed to get preferences" });
+  }
+});
+
+app.put("/api/preferences", async (req, res) => {
+  try {
+    const { channel_types } = req.body;
+    const preferences = await knock.users.setPreferences("demo-user", "default", { channel_types });
+    res.json(preferences);
+  } catch (err) {
+    console.error("Set preferences failed:", err);
+    res.status(500).json({ error: "Failed to update preferences" });
+  }
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 // Start server
 app.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT}`);
