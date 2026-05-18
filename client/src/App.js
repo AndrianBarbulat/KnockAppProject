@@ -171,43 +171,265 @@ function App() {
 
 function Navbar({ cart }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const bellRef = useRef(null);
   const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <nav className="navbar">
-      <div className="navbar-inner">
-        <Link to="/" className="brand">
-          <span className="brand-accent">Knock</span> Order Demo
-        </Link>
-        <div className="nav-links">
-          <Link to="/" className="nav-link">
-            Shop
-          </Link>
-          <Link to="/orders" className="nav-link">
-            Orders
-          </Link>
-          <Link to="/preferences" className="nav-link">
-            Preferences
-          </Link>
-          <Link to="/cart" className="nav-link cart-link">
-            Cart
-            {itemCount > 0 && <span className="cart-badge">{itemCount}</span>}
-          </Link>
-          <div className="bell-wrapper">
-            <NotificationIconButton
-              ref={bellRef}
-              onClick={() => setIsOpen((prev) => !prev)}
-            />
-            <NotificationFeedPopover
-              buttonRef={bellRef}
-              isVisible={isOpen}
-              onClose={() => setIsOpen(false)}
-            />
+    <>
+      <nav className="navbar">
+        <div className="navbar-inner">
+          <div className="navbar-left">
+            <button
+              className="hamburger"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="Open info menu"
+            >
+              ☰
+            </button>
+            <Link to="/" className="brand">
+              <span className="brand-accent">Knock</span> Order Demo
+            </Link>
+          </div>
+          <div className="nav-links">
+            <Link to="/" className="nav-link">
+              Shop
+            </Link>
+            <Link to="/orders" className="nav-link">
+              Orders
+            </Link>
+            <Link to="/preferences" className="nav-link">
+              Preferences
+            </Link>
+            <Link to="/cart" className="nav-link cart-link">
+              Cart
+              {itemCount > 0 && <span className="cart-badge">{itemCount}</span>}
+            </Link>
+            <div className="bell-wrapper">
+              <NotificationIconButton
+                ref={bellRef}
+                onClick={() => setIsOpen((prev) => !prev)}
+              />
+              <NotificationFeedPopover
+                buttonRef={bellRef}
+                isVisible={isOpen}
+                onClose={() => setIsOpen(false)}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+      <InfoPanel open={menuOpen} onClose={() => setMenuOpen(false)} />
+    </>
+  );
+}
+
+function InfoPanel({ open, onClose }) {
+  const features = [
+    {
+      name: "Multi-Channel Delivery",
+      desc: "Order confirmations are sent via both email and in-app notifications simultaneously.",
+    },
+    {
+      name: "Intelligent Message Routing",
+      desc: "When an order is shipped, an in-app notification sends immediately. After a 5-minute delay, Knock checks if the user has seen it. If not, an email is sent as a fallback. If the user already saw the in-app notification, the email is skipped.",
+    },
+    {
+      name: "User Preferences",
+      desc: "The Preferences page lets you toggle email, in-app, and SMS channels on and off. Knock evaluates these preferences at runtime and skips any channel the user has opted out of.",
+    },
+    {
+      name: "Notification Feed",
+      desc: "The bell icon in the navbar uses Knock's React SDK (@knocklabs/react) to render a real-time notification feed. Notifications appear instantly when workflows are triggered.",
+    },
+    {
+      name: "Workflow Observability",
+      desc: "Every triggered workflow can be inspected in the Knock dashboard under Observability > Logs, showing each step's execution status, rendered templates, and delivery results.",
+    },
+  ];
+
+  const workflows = [
+    {
+      name: "Order Confirmed",
+      key: "order-confirmed",
+      steps: "Trigger → In-app → Email",
+      note: "Both channels fire immediately on checkout.",
+    },
+    {
+      name: "Order Shipped",
+      key: "order-shipped",
+      steps: "Trigger → In-app → Delay (5 min) → Email (conditional)",
+      note: "Email only sends if the in-app notification has not been seen after the delay.",
+    },
+    {
+      name: "Order Delivered",
+      key: "order-delivered",
+      steps: "Trigger → In-app",
+      note: "Simple in-app notification only.",
+    },
+  ];
+
+  const endpoints = [
+    {
+      method: "GET",
+      path: "/api/products",
+      desc: "Returns the product catalog (6 items stored in memory).",
+    },
+    {
+      method: "POST",
+      path: "/api/orders",
+      desc: "Creates a new order from cart items and triggers the order-confirmed workflow in Knock. Accepts { items } in the request body where each item has name, price, and quantity.",
+    },
+    {
+      method: "GET",
+      path: "/api/orders",
+      desc: "Returns all orders for the demo user.",
+    },
+    {
+      method: "PUT",
+      path: "/api/orders/:id/ship",
+      desc: "Updates order status to shipped and triggers the order-shipped workflow. This workflow demonstrates intelligent routing with a delay and message status condition.",
+    },
+    {
+      method: "PUT",
+      path: "/api/orders/:id/deliver",
+      desc: "Updates order status to delivered and triggers the order-delivered workflow.",
+    },
+    {
+      method: "GET",
+      path: "/api/preferences",
+      desc: "Returns the demo user's notification preferences from Knock.",
+    },
+    {
+      method: "PUT",
+      path: "/api/preferences",
+      desc: "Updates notification channel preferences. Accepts { channel_types: { email: bool, in_app_feed: bool, sms: bool } }. Knock evaluates these preferences on every workflow run.",
+    },
+    {
+      method: "GET",
+      path: "/api/health",
+      desc: "Health check endpoint. Returns { status: ok }. Also used to detect if the Render free tier server is awake.",
+    },
+  ];
+
+  const stack = [
+    { label: "Backend", value: "Node.js, Express, @knocklabs/node" },
+    { label: "Frontend", value: "React, react-router-dom, @knocklabs/react" },
+    {
+      label: "Hosting",
+      value: "Render (backend web service + frontend static site)",
+    },
+    { label: "Notifications", value: "Knock" },
+  ];
+
+  return (
+    <>
+      <div
+        className={`info-overlay ${open ? "info-overlay-open" : ""}`}
+        onClick={onClose}
+      />
+      <aside
+        className={`info-panel ${open ? "info-panel-open" : ""}`}
+        aria-hidden={!open}
+      >
+        <div className="info-header">
+          <h2 className="info-title">About This Demo</h2>
+          <p className="info-subtitle">
+            Built by Andrian Barbulat as a hands-on exploration of Knock's
+            notification infrastructure API.
+          </p>
+          <button
+            className="info-close"
+            onClick={onClose}
+            aria-label="Close info menu"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">What This App Does</h3>
+          <p className="info-text">
+            This is a demo e-commerce app that triggers real notifications
+            through Knock when you place and manage orders. Browse products,
+            add them to your cart, checkout, and watch notifications arrive
+            in real-time through the notification bell. You can also manage
+            orders and control which notification channels are active through
+            the Preferences page.
+          </p>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">Knock Features Demonstrated</h3>
+          <div className="info-features">
+            {features.map((f) => (
+              <div key={f.name} className="info-feature">
+                <div className="info-feature-name">{f.name}</div>
+                <p className="info-text">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">Knock Workflows</h3>
+          <div className="info-workflows">
+            {workflows.map((w) => (
+              <div key={w.key} className="info-workflow">
+                <div className="info-workflow-name">{w.name}</div>
+                <div className="info-workflow-key">{w.key}</div>
+                <div className="info-workflow-steps">{w.steps}</div>
+                <p className="info-workflow-note">{w.note}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">API Endpoints</h3>
+          <div className="info-endpoints">
+            {endpoints.map((e, i) => (
+              <div key={i} className="info-endpoint">
+                <div className="info-endpoint-row">
+                  <span
+                    className={`info-method info-method-${e.method.toLowerCase()}`}
+                  >
+                    {e.method}
+                  </span>
+                  <span className="info-path">{e.path}</span>
+                </div>
+                <p className="info-text">{e.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">Tech Stack</h3>
+          <div className="info-stack">
+            {stack.map((s) => (
+              <div key={s.label} className="info-stack-row">
+                <span className="info-stack-label">{s.label}</span>
+                <span className="info-stack-value">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="info-section">
+          <h3 className="info-heading">Source Code</h3>
+          <p className="info-text">Full source code available on GitHub</p>
+          <a
+            className="info-link"
+            href="https://github.com/AndrianBarbulat/KnockAppProject"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            github.com/AndrianBarbulat/KnockAppProject
+          </a>
+        </div>
+      </aside>
+    </>
   );
 }
 
