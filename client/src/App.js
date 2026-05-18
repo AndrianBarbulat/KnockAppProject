@@ -365,24 +365,24 @@ function Navbar({ cart, onSignOut }) {
 function InfoPanel({ open, onClose }) {
   const features = [
     {
-      name: "Multi-Channel Delivery",
-      desc: "Order confirmations are sent via both email and in-app notifications simultaneously.",
+      name: "Sending to More Than One Channel",
+      desc: "When you place an order, Knock sends both an email and an in-app notification at the same time.",
     },
     {
-      name: "Intelligent Message Routing",
-      desc: "When an order is shipped, an in-app notification sends immediately. After a 5-minute delay, Knock checks if the user has seen it. If not, an email is sent as a fallback. If the user already saw the in-app notification, the email is skipped.",
+      name: "Smart Fallback (Delay + Check)",
+      desc: "When an order ships, you get an in-app notification right away. Knock then waits 5 minutes and checks if you saw it. If you didn't, it sends an email as a backup. If you did, it skips the email so you aren't bothered twice.",
     },
     {
       name: "User Preferences",
-      desc: "The Preferences page lets you toggle email, in-app, and SMS channels on and off. Knock evaluates these preferences at runtime and skips any channel the user has opted out of.",
+      desc: "The Preferences page lets you turn email, in-app, and SMS on or off. Knock checks these settings every time it tries to send something and skips any channel you've turned off.",
     },
     {
-      name: "Notification Feed",
-      desc: "The bell icon in the navbar uses Knock's React SDK (@knocklabs/react) to render a real-time notification feed. Notifications appear instantly when workflows are triggered.",
+      name: "Live Notification Feed",
+      desc: "The bell icon in the top bar uses Knock's React library to show a live feed. New notifications appear right when they're sent, no refresh needed.",
     },
     {
-      name: "Workflow Observability",
-      desc: "Every triggered workflow can be inspected in the Knock dashboard under Observability > Logs, showing each step's execution status, rendered templates, and delivery results.",
+      name: "Dashboard Logs",
+      desc: "Every notification Knock sends shows up in the Knock dashboard under Logs, so you can see exactly what was sent, when, and whether it was delivered.",
     },
   ];
 
@@ -391,19 +391,19 @@ function InfoPanel({ open, onClose }) {
       name: "Order Confirmed",
       key: "order-confirmed",
       steps: "Trigger → In-app → Email",
-      note: "Both channels fire immediately on checkout.",
+      note: "Both notifications go out right after you check out.",
     },
     {
       name: "Order Shipped",
       key: "order-shipped",
-      steps: "Trigger → In-app → Delay (5 min) → Email (conditional)",
-      note: "Email only sends if the in-app notification has not been seen after the delay.",
+      steps: "Trigger → In-app → Wait 5 min → Email (only if not seen)",
+      note: "The email only sends if you didn't see the in-app notification within 5 minutes.",
     },
     {
       name: "Order Delivered",
       key: "order-delivered",
       steps: "Trigger → In-app",
-      note: "Simple in-app notification only.",
+      note: "Just a simple in-app notification.",
     },
   ];
 
@@ -411,47 +411,47 @@ function InfoPanel({ open, onClose }) {
     {
       method: "GET",
       path: "/api/products",
-      desc: "Returns the product catalog (6 items stored in memory).",
+      desc: "Gets the list of 6 products in the shop.",
     },
     {
       method: "POST",
       path: "/api/identify",
-      desc: "Identifies a user in Knock. Accepts { name, email, phone } and returns { userId, name, email }. The userId is derived from the email (lowercase, @ → _at_, . → _).",
+      desc: "Creates a user in Knock from the welcome form. Takes name, email, and phone, and builds a user ID from the email.",
     },
     {
       method: "POST",
       path: "/api/orders",
-      desc: "Creates a new order from cart items and triggers the order-confirmed workflow in Knock. Accepts { items, userId } in the request body where each item has name, price, and quantity.",
+      desc: "Creates an order from your cart and sends the order-confirmed notification.",
     },
     {
       method: "GET",
       path: "/api/orders",
-      desc: "Returns orders for the given user. Accepts ?userId=xxx as a query parameter.",
+      desc: "Gets the order list for one user.",
     },
     {
       method: "PUT",
       path: "/api/orders/:id/ship",
-      desc: "Updates order status to shipped and triggers the order-shipped workflow. Accepts { userId } in the body. Demonstrates intelligent routing with a delay and message status condition.",
+      desc: "Marks an order as shipped and sends the order-shipped notification. This is the one with the 5-minute wait and email backup.",
     },
     {
       method: "PUT",
       path: "/api/orders/:id/deliver",
-      desc: "Updates order status to delivered and triggers the order-delivered workflow. Accepts { userId } in the body.",
+      desc: "Marks an order as delivered and sends the order-delivered notification.",
     },
     {
       method: "GET",
       path: "/api/preferences",
-      desc: "Returns the user's notification preferences from Knock. Accepts ?userId=xxx as a query parameter.",
+      desc: "Gets the user's current notification settings from Knock.",
     },
     {
       method: "PUT",
       path: "/api/preferences",
-      desc: "Updates notification channel preferences. Accepts { channel_types: { email, in_app_feed, sms }, userId }. Knock evaluates these preferences on every workflow run.",
+      desc: "Saves the user's notification settings (email, in-app, SMS on or off) to Knock.",
     },
     {
       method: "GET",
       path: "/api/health",
-      desc: "Health check endpoint. Returns { status: ok }. Also used to detect if the Render free tier server is awake.",
+      desc: "A quick check to see if the server is awake. Used at startup because the free Render server goes to sleep after 15 minutes.",
     },
   ];
 
@@ -478,8 +478,8 @@ function InfoPanel({ open, onClose }) {
         <div className="info-header">
           <h2 className="info-title">About This Demo</h2>
           <p className="info-subtitle">
-            Built by Andrian Barbulat as a hands-on exploration of Knock's
-            notification infrastructure API.
+            Built by Andrian Barbulat to learn how Knock's notification
+            system works.
           </p>
           <button
             className="info-close"
@@ -493,12 +493,11 @@ function InfoPanel({ open, onClose }) {
         <div className="info-section">
           <h3 className="info-heading">What This App Does</h3>
           <p className="info-text">
-            This is a demo e-commerce app that triggers real notifications
-            through Knock when you place and manage orders. Browse products,
-            add them to your cart, checkout, and watch notifications arrive
-            in real-time through the notification bell. You can also manage
-            orders and control which notification channels are active through
-            the Preferences page.
+            This is a small shop demo that sends real notifications through
+            Knock when you place and manage orders. Add things to your cart,
+            check out, and you'll see notifications appear in the bell icon.
+            You can also mark orders as shipped or delivered, and turn email,
+            in-app, or SMS notifications on and off from the Preferences page.
           </p>
         </div>
 
