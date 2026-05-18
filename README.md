@@ -118,5 +118,5 @@ knock-order-app/
 
 ## Live Demo
 
-- **Frontend:** https://your-app.vercel.app
-- **Backend:** https://your-app.onrender.com
+- **Frontend:** https://knockappproject-1.onrender.com
+- **Backend:** https://knockappproject.onrender.com
