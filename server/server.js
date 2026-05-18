@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { Knock } = require("@knocklabs/node");
+const Knock = require("@knocklabs/node").default;
 
 const app = express();
 const knock = new Knock({ apiKey: process.env.KNOCK_API_KEY });
@@ -54,7 +54,7 @@ app.post("/api/identify", async (req, res) => {
     });
     res.json({ userId, name, email, phone: phone || null });
   } catch (err) {
-    console.error("Identify failed:", err);
+    console.error("Identify failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to identify user" });
   }
 });
@@ -90,7 +90,7 @@ app.post("/api/orders", async (req, res) => {
 
     res.status(201).json(order);
   } catch (err) {
-    console.error("Order creation failed:", err);
+    console.error("Order creation failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to create order" });
   }
 });
@@ -120,7 +120,7 @@ app.put("/api/orders/:id/ship", async (req, res) => {
 
     res.json(order);
   } catch (err) {
-    console.error("Ship order failed:", err);
+    console.error("Ship order failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to ship order" });
   }
 });
@@ -143,7 +143,7 @@ app.put("/api/orders/:id/deliver", async (req, res) => {
 
     res.json(order);
   } catch (err) {
-    console.error("Deliver order failed:", err);
+    console.error("Deliver order failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to deliver order" });
   }
 });
@@ -154,7 +154,7 @@ app.get("/api/preferences", async (req, res) => {
     const preferences = await knock.users.getPreferences(userId, "default");
     res.json(preferences);
   } catch (err) {
-    console.error("Get preferences failed:", err);
+    console.error("Get preferences failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to get preferences" });
   }
 });
@@ -166,7 +166,7 @@ app.put("/api/preferences", async (req, res) => {
     const preferences = await knock.users.setPreferences(userId, "default", { channel_types });
     res.json(preferences);
   } catch (err) {
-    console.error("Set preferences failed:", err);
+    console.error("Set preferences failed:", err.status, err.message);
     res.status(500).json({ error: "Failed to update preferences" });
   }
 });
