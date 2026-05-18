@@ -23,9 +23,40 @@ const products = [
 const orders = [];
 let orderCounter = 1000;
 
+function emailToUserId(email) {
+  return String(email).toLowerCase().trim().replace(/@/g, "_at_").replace(/\./g, "_");
+}
+
+function resolveUserId(req) {
+  return (
+    (req.body && req.body.userId) ||
+    (req.query && req.query.userId) ||
+    "demo-user"
+  );
+}
+
 // Routes
 app.get("/api/products", (req, res) => {
   res.json(products);
+});
+
+app.post("/api/identify", async (req, res) => {
+  try {
+    const { name, email, phone } = req.body || {};
+    if (!name || !email) {
+      return res.status(400).json({ error: "Name and email are required" });
+    }
+    const userId = emailToUserId(email);
+    await knock.users.identify(userId, {
+      name,
+      email,
+      phone_number: phone || undefined,
+    });
+    res.json({ userId, name, email, phone: phone || null });
+  } catch (err) {
+    console.error("Identify failed:", err);
+    res.status(500).json({ error: "Failed to identify user" });
+  }
 });
 
 app.post("/api/orders", async (req, res) => {
@@ -34,9 +65,11 @@ app.post("/api/orders", async (req, res) => {
     if (!items || items.length === 0) {
       return res.status(400).json({ error: "Cart is empty" });
     }
+    const userId = resolveUserId(req);
 
     const order = {
       id: `ORD-${++orderCounter}`,
+      userId,
       items,
       total: items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2),
       status: "confirmed",
@@ -46,7 +79,7 @@ app.post("/api/orders", async (req, res) => {
 
     // Trigger Knock notification
     await knock.workflows.trigger("order-confirmed", {
-      recipients: ["demo-user"],
+      recipients: [userId],
       data: {
         orderNumber: order.id,
         itemNames: order.items.map(i => i.name).join(", "),
@@ -63,7 +96,8 @@ app.post("/api/orders", async (req, res) => {
 });
 
 app.get("/api/orders", (req, res) => {
-  res.json(orders);
+  const userId = resolveUserId(req);
+  res.json(orders.filter(o => o.userId === userId));
 });
 
 app.put("/api/orders/:id/ship", async (req, res) => {
@@ -71,11 +105,12 @@ app.put("/api/orders/:id/ship", async (req, res) => {
     const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
+    const userId = resolveUserId(req);
     order.status = "shipped";
     order.updatedAt = new Date().toISOString();
 
     await knock.workflows.trigger("order-shipped", {
-      recipients: ["demo-user"],
+      recipients: [userId],
       data: {
         orderNumber: order.id,
         itemNames: order.items.map(i => i.name).join(", "),
@@ -95,11 +130,12 @@ app.put("/api/orders/:id/deliver", async (req, res) => {
     const order = orders.find(o => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
+    const userId = resolveUserId(req);
     order.status = "delivered";
     order.updatedAt = new Date().toISOString();
 
     await knock.workflows.trigger("order-delivered", {
-      recipients: ["demo-user"],
+      recipients: [userId],
       data: {
         orderNumber: order.id
       }
@@ -114,7 +150,8 @@ app.put("/api/orders/:id/deliver", async (req, res) => {
 
 app.get("/api/preferences", async (req, res) => {
   try {
-    const preferences = await knock.users.getPreferences("demo-user", "default");
+    const userId = resolveUserId(req);
+    const preferences = await knock.users.getPreferences(userId, "default");
     res.json(preferences);
   } catch (err) {
     console.error("Get preferences failed:", err);
@@ -125,7 +162,8 @@ app.get("/api/preferences", async (req, res) => {
 app.put("/api/preferences", async (req, res) => {
   try {
     const { channel_types } = req.body;
-    const preferences = await knock.users.setPreferences("demo-user", "default", { channel_types });
+    const userId = resolveUserId(req);
+    const preferences = await knock.users.setPreferences(userId, "default", { channel_types });
     res.json(preferences);
   } catch (err) {
     console.error("Set preferences failed:", err);

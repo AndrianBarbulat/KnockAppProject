@@ -106,9 +106,32 @@ function LoadingScreen({ status, stage, onRetry }) {
   );
 }
 
+const USER_STORAGE_KEY = "knockDemoUser";
+
+function loadStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
   const { status, stage, retry } = useServerHealth();
+  const [user, setUser] = useState(loadStoredUser);
   const [cart, setCart] = useState([]);
+
+  const handleIdentified = (identified) => {
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(identified));
+    setUser(identified);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setUser(null);
+    setCart([]);
+  };
 
   const addToCart = (product) => {
     setCart((prev) => {
@@ -138,14 +161,18 @@ function App() {
     return <LoadingScreen status={status} stage={stage} onRetry={retry} />;
   }
 
+  if (!user) {
+    return <WelcomeScreen onIdentified={handleIdentified} />;
+  }
+
   return (
     <KnockProvider
       apiKey={process.env.REACT_APP_KNOCK_PUBLIC_KEY}
-      userId="demo-user"
+      userId={user.userId}
     >
       <KnockFeedProvider feedId={process.env.REACT_APP_KNOCK_FEED_CHANNEL_ID}>
         <BrowserRouter>
-          <Navbar cart={cart} />
+          <Navbar cart={cart} onSignOut={handleSignOut} />
           <main className="container">
             <Routes>
               <Route path="/" element={<ShopPage addToCart={addToCart} />} />
@@ -156,11 +183,18 @@ function App() {
                     cart={cart}
                     updateQuantity={updateQuantity}
                     clearCart={clearCart}
+                    userId={user.userId}
                   />
                 }
               />
-              <Route path="/orders" element={<OrdersPage />} />
-              <Route path="/preferences" element={<PreferencesPage />} />
+              <Route
+                path="/orders"
+                element={<OrdersPage userId={user.userId} />}
+              />
+              <Route
+                path="/preferences"
+                element={<PreferencesPage userId={user.userId} />}
+              />
             </Routes>
           </main>
         </BrowserRouter>
@@ -169,7 +203,104 @@ function App() {
   );
 }
 
-function Navbar({ cart }) {
+function WelcomeScreen({ onIdentified }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    if (!trimmedName || !trimmedEmail) {
+      setError("Name and email are required.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/identify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          phone: phone.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("identify failed");
+      const data = await res.json();
+      onIdentified(data);
+    } catch (err) {
+      console.error(err);
+      setError("Could not start the demo. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="welcome-screen">
+      <div className="welcome-card">
+        <h1 className="welcome-title">Welcome to the Knock Order Demo</h1>
+        <p className="welcome-subtitle">
+          Enter your details below to receive real notifications as you test
+          the app.
+        </p>
+        <div className="welcome-form">
+          <label className="welcome-field">
+            <span className="welcome-label">Name</span>
+            <input
+              className="welcome-input"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              disabled={submitting}
+            />
+          </label>
+          <label className="welcome-field">
+            <span className="welcome-label">Email</span>
+            <input
+              className="welcome-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              disabled={submitting}
+            />
+          </label>
+          <label className="welcome-field">
+            <span className="welcome-label">Phone (optional)</span>
+            <input
+              className="welcome-input"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 555 555 5555"
+              disabled={submitting}
+            />
+          </label>
+        </div>
+        {error && <p className="welcome-error">{error}</p>}
+        <button
+          className="btn btn-primary btn-full"
+          onClick={submit}
+          disabled={submitting}
+        >
+          {submitting ? "Starting..." : "Start Demo"}
+        </button>
+        <p className="welcome-note">
+          Your email is used to demonstrate Knock's email notification
+          channel. No marketing emails will be sent.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Navbar({ cart, onSignOut }) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const bellRef = useRef(null);
@@ -216,6 +347,13 @@ function Navbar({ cart }) {
                 onClose={() => setIsOpen(false)}
               />
             </div>
+            <button
+              type="button"
+              className="nav-link nav-link-button"
+              onClick={onSignOut}
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </nav>
@@ -277,33 +415,38 @@ function InfoPanel({ open, onClose }) {
     },
     {
       method: "POST",
+      path: "/api/identify",
+      desc: "Identifies a user in Knock. Accepts { name, email, phone } and returns { userId, name, email }. The userId is derived from the email (lowercase, @ → _at_, . → _).",
+    },
+    {
+      method: "POST",
       path: "/api/orders",
-      desc: "Creates a new order from cart items and triggers the order-confirmed workflow in Knock. Accepts { items } in the request body where each item has name, price, and quantity.",
+      desc: "Creates a new order from cart items and triggers the order-confirmed workflow in Knock. Accepts { items, userId } in the request body where each item has name, price, and quantity.",
     },
     {
       method: "GET",
       path: "/api/orders",
-      desc: "Returns all orders for the demo user.",
+      desc: "Returns orders for the given user. Accepts ?userId=xxx as a query parameter.",
     },
     {
       method: "PUT",
       path: "/api/orders/:id/ship",
-      desc: "Updates order status to shipped and triggers the order-shipped workflow. This workflow demonstrates intelligent routing with a delay and message status condition.",
+      desc: "Updates order status to shipped and triggers the order-shipped workflow. Accepts { userId } in the body. Demonstrates intelligent routing with a delay and message status condition.",
     },
     {
       method: "PUT",
       path: "/api/orders/:id/deliver",
-      desc: "Updates order status to delivered and triggers the order-delivered workflow.",
+      desc: "Updates order status to delivered and triggers the order-delivered workflow. Accepts { userId } in the body.",
     },
     {
       method: "GET",
       path: "/api/preferences",
-      desc: "Returns the demo user's notification preferences from Knock.",
+      desc: "Returns the user's notification preferences from Knock. Accepts ?userId=xxx as a query parameter.",
     },
     {
       method: "PUT",
       path: "/api/preferences",
-      desc: "Updates notification channel preferences. Accepts { channel_types: { email: bool, in_app_feed: bool, sms: bool } }. Knock evaluates these preferences on every workflow run.",
+      desc: "Updates notification channel preferences. Accepts { channel_types: { email, in_app_feed, sms }, userId }. Knock evaluates these preferences on every workflow run.",
     },
     {
       method: "GET",
@@ -477,7 +620,7 @@ function ShopPage({ addToCart }) {
   );
 }
 
-function CartPage({ cart, updateQuantity, clearCart }) {
+function CartPage({ cart, updateQuantity, clearCart, userId }) {
   const [placing, setPlacing] = useState(false);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
@@ -496,7 +639,7 @@ function CartPage({ cart, updateQuantity, clearCart }) {
         const res = await fetch(`${API_URL}/orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: cart }),
+          body: JSON.stringify({ items: cart, userId }),
         });
         if (!res.ok) throw new Error("Checkout failed");
         clearCart();
@@ -576,11 +719,11 @@ function CartPage({ cart, updateQuantity, clearCart }) {
   );
 }
 
-function OrdersPage() {
+function OrdersPage({ userId }) {
   const [orders, setOrders] = useState([]);
 
   const loadOrders = () => {
-    fetch(`${API_URL}/orders`)
+    fetch(`${API_URL}/orders?userId=${encodeURIComponent(userId)}`)
       .then((r) => r.json())
       .then(setOrders)
       .catch((err) => console.error("Failed to load orders:", err));
@@ -588,11 +731,15 @@ function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [userId]);
 
   const updateStatus = async (id, action) => {
     try {
-      await fetch(`${API_URL}/orders/${id}/${action}`, { method: "PUT" });
+      await fetch(`${API_URL}/orders/${id}/${action}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
       loadOrders();
     } catch (err) {
       console.error(`Failed to ${action} order:`, err);
@@ -653,7 +800,7 @@ function OrdersPage() {
   );
 }
 
-function PreferencesPage() {
+function PreferencesPage({ userId }) {
   const [channelTypes, setChannelTypes] = useState({
     email: true,
     in_app_feed: true,
@@ -662,7 +809,7 @@ function PreferencesPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/preferences`)
+    fetch(`${API_URL}/preferences?userId=${encodeURIComponent(userId)}`)
       .then((r) => r.json())
       .then((prefs) => {
         if (prefs && prefs.channel_types) {
@@ -670,7 +817,7 @@ function PreferencesPage() {
         }
       })
       .catch((err) => console.error("Failed to load preferences:", err));
-  }, []);
+  }, [userId]);
 
   const toggle = async (key) => {
     const updated = { ...channelTypes, [key]: !channelTypes[key] };
@@ -680,7 +827,7 @@ function PreferencesPage() {
       await fetch(`${API_URL}/preferences`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel_types: updated }),
+        body: JSON.stringify({ channel_types: updated, userId }),
       });
     } catch (err) {
       console.error("Failed to save preferences:", err);
