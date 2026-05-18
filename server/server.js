@@ -1,10 +1,10 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const Knock = require("@knocklabs/node").default;
+const { Knock } = require("@knocklabs/node");
 
 const app = express();
-const knock = new Knock({ apiKey: process.env.KNOCK_API_KEY });
+const knock = new Knock(process.env.KNOCK_API_KEY);
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
@@ -151,7 +151,7 @@ app.put("/api/orders/:id/deliver", async (req, res) => {
 app.get("/api/preferences", async (req, res) => {
   try {
     const userId = resolveUserId(req);
-    const preferences = await knock.users.getPreferences(userId, "default");
+    const preferences = await knock.users.getPreferences(userId);
     res.json(preferences);
   } catch (err) {
     console.error("Get preferences failed:", err.status, err.message);
@@ -163,7 +163,7 @@ app.put("/api/preferences", async (req, res) => {
   try {
     const { channel_types } = req.body;
     const userId = resolveUserId(req);
-    const preferences = await knock.users.setPreferences(userId, "default", { channel_types });
+    const preferences = await knock.users.setPreferences(userId, { channel_types });
     res.json(preferences);
   } catch (err) {
     console.error("Set preferences failed:", err.status, err.message);
