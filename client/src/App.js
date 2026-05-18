@@ -17,7 +17,97 @@ import "./App.css";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
+function useServerHealth() {
+  const [status, setStatus] = useState("loading");
+  const [stage, setStage] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+    setStatus("loading");
+    setStage(0);
+
+    const stage1 = setTimeout(() => {
+      if (!cancelled) setStage(1);
+    }, 3000);
+    const stage2 = setTimeout(() => {
+      if (!cancelled) setStage(2);
+    }, 15000);
+    const errorTimer = setTimeout(() => {
+      if (cancelled) return;
+      cancelled = true;
+      setStatus("error");
+    }, 60000);
+
+    const tryHealth = () => {
+      fetch(`${API_URL}/health`)
+        .then((r) => {
+          if (cancelled) return;
+          if (!r.ok) throw new Error("health check failed");
+          cancelled = true;
+          clearTimeout(stage1);
+          clearTimeout(stage2);
+          clearTimeout(errorTimer);
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          retryTimer = setTimeout(tryHealth, 2000);
+        });
+    };
+
+    tryHealth();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(stage1);
+      clearTimeout(stage2);
+      clearTimeout(errorTimer);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [attempt]);
+
+  const retry = () => setAttempt((a) => a + 1);
+
+  return { status, stage, retry };
+}
+
+function LoadingScreen({ status, stage, onRetry }) {
+  let text;
+  if (stage >= 2) {
+    text = "Almost there, just a few more seconds...";
+  } else if (stage >= 1) {
+    text =
+      "The server is hosted on Render's free tier and goes to sleep after 15 minutes of inactivity. It's waking up now, this usually takes 20-30 seconds...";
+  } else {
+    text = "Connecting to server...";
+  }
+
+  return (
+    <div className="app-loading">
+      {status === "error" ? (
+        <>
+          <p className="app-loading-text">
+            Could not connect to server. The free tier may be temporarily
+            unavailable.
+          </p>
+          <button className="btn btn-primary" onClick={onRetry}>
+            Try Again
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="app-loading-spinner" />
+          <p className="app-loading-text">{text}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function App() {
+  const { status, stage, retry } = useServerHealth();
   const [cart, setCart] = useState([]);
 
   const addToCart = (product) => {
@@ -43,6 +133,10 @@ function App() {
   };
 
   const clearCart = () => setCart([]);
+
+  if (status !== "ready") {
+    return <LoadingScreen status={status} stage={stage} onRetry={retry} />;
+  }
 
   return (
     <KnockProvider
@@ -170,22 +264,31 @@ function CartPage({ cart, updateQuantity, clearCart }) {
 
   const checkout = async () => {
     setPlacing(true);
-    try {
-      const res = await fetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart }),
-      });
-      if (!res.ok) throw new Error("Checkout failed");
-      clearCart();
-      setMessage("Order placed! Check your notifications.");
-      setTimeout(() => navigate("/orders"), 1500);
-    } catch (err) {
-      console.error(err);
-      setMessage("Checkout failed. Please try again.");
-    } finally {
-      setPlacing(false);
+    setMessage("");
+    let lastErr = null;
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      try {
+        const res = await fetch(`${API_URL}/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cart }),
+        });
+        if (!res.ok) throw new Error("Checkout failed");
+        clearCart();
+        setMessage("Order placed! Check your notifications.");
+        setTimeout(() => navigate("/orders"), 1500);
+        setPlacing(false);
+        return;
+      } catch (err) {
+        lastErr = err;
+      }
     }
+    console.error(lastErr);
+    setMessage("Checkout failed. Please try again.");
+    setPlacing(false);
   };
 
   if (cart.length === 0 && !message) {
@@ -243,7 +346,7 @@ function CartPage({ cart, updateQuantity, clearCart }) {
             onClick={checkout}
             disabled={placing}
           >
-            {placing ? "Placing order..." : "Checkout"}
+            {placing ? "Processing..." : "Checkout"}
           </button>
         </div>
       )}
